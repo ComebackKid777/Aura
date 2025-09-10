@@ -26,8 +26,8 @@
 #define DEFAULT_CAPTIVE_SSID "Aura"
 #define UPDATE_INTERVAL 600000UL  // 10 minutes
 
-// Night mode starts at 10pm and ends at 6am
-#define NIGHT_MODE_START_HOUR 22
+// Night mode starts at 8pm and ends at 6am
+#define NIGHT_MODE_START_HOUR 20
 #define NIGHT_MODE_END_HOUR 6
 
 LV_FONT_DECLARE(lv_font_montserrat_latin_12);
@@ -194,9 +194,9 @@ String hour_of_day(int hour) {
 
   if (use_24_hour) {
     if (hour < 10)
-      return String("0") + String(hour);
+      return String("0") + String(hour) + String(":00"); // Nicer 24hr formatting
     else
-      return String(hour);
+      return String(hour) + String(":00"); // Nicer 24hr formatting
   } else {
     if(hour == 0)   return String("12") + strings->am;
     if(hour == 12)  return String(strings->noon);
