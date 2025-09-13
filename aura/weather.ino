@@ -26,10 +26,6 @@
 #define DEFAULT_CAPTIVE_SSID "Aura"
 #define UPDATE_INTERVAL 600000UL  // 10 minutes
 
-// Night mode starts at 8pm and ends at 6am
-#define NIGHT_MODE_START_HOUR 20
-#define NIGHT_MODE_END_HOUR 6
-
 LV_FONT_DECLARE(lv_font_montserrat_latin_12);
 LV_FONT_DECLARE(lv_font_montserrat_latin_14);
 LV_FONT_DECLARE(lv_font_montserrat_latin_16);
@@ -75,6 +71,10 @@ static String location = String(LOCATION_DEFAULT);
 static char dd_opts[512];
 static DynamicJsonDocument geoDoc(8 * 1024);
 static JsonArray geoResults;
+
+// Night mode starts at 8pm and ends at 6am
+static int night_mode_start_hour = 20;
+static int night_mode_end_hour = 6;
 
 // Screen dimming variables
 static bool night_mode_active = false;
@@ -945,7 +945,7 @@ bool night_mode_should_be_active() {
   if (!use_night_mode) return false;
   
   int hour = timeinfo.tm_hour;
-  return (hour >= NIGHT_MODE_START_HOUR || hour < NIGHT_MODE_END_HOUR);
+  return (hour >= night_mode_start_hour || hour < night_mode_end_hour);
 }
 
 void activate_night_mode() {
@@ -1018,6 +1018,14 @@ void fetch_and_update_weather() {
     Serial.println("WiFi connection reestablished.");
   }
 
+  struct tm timeinfo;
+  char dayOfWeek[10];
+  strftime(dayOfWeek, sizeof(dayOfWeek), "%A", &timeinfo);
+  if (dayOfWeek == "Saturday" || dayOfWeek == "Sunday") {
+    night_mode_end_hour = 9;
+  } else {
+    night_mode_end_hour = 6;
+  }
 
   String url = String("http://api.open-meteo.com/v1/forecast?latitude=")
                + latitude + "&longitude=" + longitude
