@@ -65,7 +65,7 @@ static const LocalizedStrings strings_en = {
   "reconfigure Wi-Fi credentials.",
   "Language:",
   {"Sun", "Mon", "Tues", "Wed", "Thurs", "Fri", "Sat"},
-  "Dim screen at night"
+  "Night Mode"
 };
 
 static const LocalizedStrings strings_es = {

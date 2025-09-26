@@ -75,6 +75,7 @@ static JsonArray geoResults;
 // Night mode starts at 8pm and ends at 6am
 static int night_mode_start_hour = 20;
 static int night_mode_end_hour = 6;
+static int day_of_the_week = -1;
 
 // Screen dimming variables
 static bool night_mode_active = false;
@@ -109,6 +110,7 @@ static lv_obj_t *clock_24hr_switch;
 static lv_obj_t *night_mode_switch;
 static lv_obj_t *language_dropdown;
 static lv_obj_t *lbl_clock;
+static lv_obj_t *lbl_date;
 
 // Weather icons
 LV_IMG_DECLARE(icon_blizzard);
@@ -235,16 +237,21 @@ static void update_clock(lv_timer_t *timer) {
   if (!getLocalTime(&timeinfo)) return;
 
   const LocalizedStrings* strings = get_strings(current_language);
-  char buf[16];
+  
+  char clock_buf[16];
   if (use_24_hour) {
-    snprintf(buf, sizeof(buf), "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+    snprintf(clock_buf, sizeof(clock_buf), "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
   } else {
     int hour = timeinfo.tm_hour % 12;
     if(hour == 0) hour = 12;
     const char *ampm = (timeinfo.tm_hour < 12) ? strings->am : strings->pm;
-    snprintf(buf, sizeof(buf), "%d:%02d%s", hour, timeinfo.tm_min, ampm);
-  }
-  lv_label_set_text(lbl_clock, buf);
+    snprintf(clock_buf, sizeof(clock_buf), "%d:%02d%s", hour, timeinfo.tm_min, ampm);
+  }  
+  lv_label_set_text(lbl_clock, clock_buf);
+
+  char date_buf[16];
+  snprintf(date_buf, sizeof(date_buf), "%02d/%02d/%02d", timeinfo.tm_mon + 1, timeinfo.tm_mday, timeinfo.tm_year + 1900);
+  lv_label_set_text(lbl_date, date_buf);
 }
 
 static void ta_event_cb(lv_event_t *e) {
@@ -412,7 +419,7 @@ void create_ui() {
 
   img_today_icon = lv_img_create(scr);
   lv_img_set_src(img_today_icon, &image_partly_cloudy);
-  lv_obj_align(img_today_icon, LV_ALIGN_TOP_MID, -64, 4);
+  lv_obj_align(img_today_icon, LV_ALIGN_TOP_MID, -64, 20);
 
   static lv_style_t default_label_style;
   lv_style_init(&default_label_style);
@@ -424,20 +431,20 @@ void create_ui() {
   lbl_today_temp = lv_label_create(scr);
   lv_label_set_text(lbl_today_temp, strings->temp_placeholder);
   lv_obj_set_style_text_font(lbl_today_temp, get_font_42(), LV_PART_MAIN | LV_STATE_DEFAULT);
-  lv_obj_align(lbl_today_temp, LV_ALIGN_TOP_MID, 45, 25);
+  lv_obj_align(lbl_today_temp, LV_ALIGN_TOP_MID, 55, 40);
   lv_obj_add_style(lbl_today_temp, &default_label_style, LV_PART_MAIN | LV_STATE_DEFAULT);
 
   lbl_today_feels_like = lv_label_create(scr);
   lv_label_set_text(lbl_today_feels_like, strings->feels_like_temp);
   lv_obj_set_style_text_font(lbl_today_feels_like, get_font_14(), LV_PART_MAIN | LV_STATE_DEFAULT);
   lv_obj_set_style_text_color(lbl_today_feels_like, lv_color_hex(0xe4ffff), LV_PART_MAIN | LV_STATE_DEFAULT);
-  lv_obj_align(lbl_today_feels_like, LV_ALIGN_TOP_MID, 45, 75);
+  lv_obj_align(lbl_today_feels_like, LV_ALIGN_TOP_MID, 55, 80);
 
   lbl_forecast = lv_label_create(scr);
   lv_label_set_text(lbl_forecast, strings->seven_day_forecast);
   lv_obj_set_style_text_font(lbl_forecast, get_font_12(), LV_PART_MAIN | LV_STATE_DEFAULT);
   lv_obj_set_style_text_color(lbl_forecast, lv_color_hex(0xe4ffff), LV_PART_MAIN | LV_STATE_DEFAULT);
-  lv_obj_align(lbl_forecast, LV_ALIGN_TOP_LEFT, 20, 110);
+  lv_obj_align(lbl_forecast, LV_ALIGN_TOP_LEFT, 10, 120);
 
   box_daily = lv_obj_create(scr);
   lv_obj_set_size(box_daily, 220, 180);
@@ -512,6 +519,13 @@ void create_ui() {
   }
 
   lv_obj_add_flag(box_hourly, LV_OBJ_FLAG_HIDDEN);
+
+  // Create date label in the top-left corner
+  lbl_date = lv_label_create(scr);
+  lv_obj_set_style_text_font(lbl_date, get_font_14(), LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_style_text_color(lbl_date, lv_color_hex(0xb9ecff), LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_label_set_text(lbl_date, "");
+  lv_obj_align(lbl_date, LV_ALIGN_TOP_LEFT, 10, 2);
 
   // Create clock label in the top-right corner
   lbl_clock = lv_label_create(scr);
@@ -1018,15 +1032,6 @@ void fetch_and_update_weather() {
     Serial.println("WiFi connection reestablished.");
   }
 
-  struct tm timeinfo;
-  char dayOfWeek[10];
-  strftime(dayOfWeek, sizeof(dayOfWeek), "%A", &timeinfo);
-  if (dayOfWeek == "Saturday" || dayOfWeek == "Sunday") {
-    night_mode_end_hour = 9;
-  } else {
-    night_mode_end_hour = 6;
-  }
-
   String url = String("http://api.open-meteo.com/v1/forecast?latitude=")
                + latitude + "&longitude=" + longitude
                + "&current=temperature_2m,apparent_temperature,is_day,weather_code"
@@ -1120,7 +1125,16 @@ void fetch_and_update_weather() {
         lv_img_set_src(img_hourly[i], choose_icon(hourly_weather_codes[i].as<int>(), hourly_is_day[i].as<int>()));
       }
 
-
+      struct tm timeinfo;
+      if (!getLocalTime(&timeinfo)) return;
+      day_of_the_week = timeinfo.tm_wday;
+      Serial.printf("Day of the week: %d\n", day_of_the_week);      
+      if (day_of_the_week == 0 || day_of_the_week == 6) {
+        night_mode_end_hour = 9;
+        Serial.printf("Changing Night Mode End Time to %d\n", night_mode_end_hour);
+      } else {
+        night_mode_end_hour = 6;
+      }
     } else {
       Serial.println("JSON parse failed on result from " + url);
     }
